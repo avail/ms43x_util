@@ -14,26 +14,19 @@ public partial class VOVE : Form
     double m_CurrentIAT = 30.0f;
     double m_CurrentDisplacement = 2.793;
 
-    double[] m_RpmValues = [192, 448, 704, 992, 1504, 2016, 2496, 3008, 3488, 4000, 4512, 4992, 5500, 6016, 6200, 6496];
-    double[] m_LoadValues = [5.000, 10.000, 15.000, 20.001, 25.001, 30.001, 35.001, 40.001, 45.001, 50.002, 60.002, 70.002, 80.003, 90.003, 105.003, 125.004];
-
     public VOVE()
     {
         InitializeComponent();
 
         FormClosing += (s, e) => G.CloseApp();
 
-        // #TODO: fill in the tables based on xdf data
-        // columns: ldpm_n_32_10
-        // rows: ldpm_map_1
-
         voTable.DoSetup(
-            [544, 704, 992, 1248, 1504, 2016, 2496, 3008, 4000, 4992, 6016, 7008],
-            [5, 10, 20, 30, 60, 90, 105, 125]);
+            [544, 704, 992, 1248, 1504, 2016, 2496, 3008, 4000, 4992, 6016, 7111],
+            [5, 10, 20, 30, 60, 90, 105, 111]);
 
         veTable.DoSetup(
-            m_RpmValues,
-            m_LoadValues);
+            [192, 448, 704, 992, 1504, 2016, 2496, 3008, 3488, 4000, 4512, 4992, 5500, 6016, 6200, 6226],
+            [5.000, 10.000, 15.000, 20.001, 25.001, 30.001, 35.001, 40.001, 45.001, 50.002, 60.002, 70.002, 80.003, 90.003, 105.003, 123.004]);
 
         iatTextBox.KeyPress += HandleKeyPress;
         displacementTextBox.KeyPress += HandleKeyPress;
@@ -115,16 +108,24 @@ public partial class VOVE : Form
 
     void CalcVE()
     {
-        var table = m_Ms43Xdf.Tables.FirstOrDefault(c => c.Title == currentMapLabel.Text);
-        var axis = table.Axes.FirstOrDefault(c => c.Id == "z");
+        var rpm = m_Ms43Bin.GetData(m_Ms43Xdf.Tables["ldpm_n_32_10"].Axes[2], "32.0 * X").Take(12).ToArray();
+        var load = m_Ms43Bin.GetData(m_Ms43Xdf.Tables["ldpm_map_1"].Axes[2], "0.082921489 * X").Take(8).ToArray();
 
-        var data = (double[,])m_Ms43Bin.ReadAxisData(table.Axes[2]);
+        voTable.DoSetup(rpm, load);
+
+        var axis = m_Ms43Xdf.Tables[currentMapLabel.Text].Axes[2];
+        var data = (double[,])m_Ms43Bin.ReadAxisData(axis);
         var result = XdfMath.ApplyMath(data, "0.021194781 * X");
 
         DisplayVO(result);
 
+        var rpmx = G.MapFile.GetData(G.Xdf.Tables["ldpm_ve_n"].Axes[2], "1.0 * X").ToArray();
+        var loadx = G.MapFile.GetData(G.Xdf.Tables["ldpm_ve_map"].Axes[2], "0.0082921489 * X").ToArray();
+
+        veTable.DoSetup(rpmx, loadx);
+
         var ve = new VOtoVEConverter(result, m_CurrentIAT, m_CurrentDisplacement);
-        var vet = ve.CalculateVETable(m_RpmValues, m_LoadValues, m_CurrentIAT, m_CurrentDisplacement);
+        var vet = ve.CalculateVETable(rpmx, loadx, m_CurrentIAT, m_CurrentDisplacement);
 
         for (int i = 0; i < vet.GetLength(0); i++)
         {
@@ -187,32 +188,15 @@ public class VOtoVEConverter
 
     public VOtoVEConverter(double[,] inputVOTable, double iat, double engineDisplacement)
     {
-        this.m_ExpandedVOTable = ExpandVOTable(inputVOTable, 16, 16);
-        LogVOTable();
-    }
-
-    void LogVOTable()
-    {
-        for (int row = 0; row < 16; row++)
-        {
-            var final = "";
-            for (int col = 0; col < 16; col++)
-            {
-                double voValue = m_ExpandedVOTable[row, col];
-                final += voValue.ToString("F3");
-                final += "\t";
-            }
-
-            Trace.WriteLine(final);
-        }
+        m_ExpandedVOTable = ExpandVOTable(inputVOTable, 16, 16);
     }
 
     double[,] ExpandVOTable(double[,] src, int newH, int newW)
     {
-        int srcH = src.GetLength(0);
-        int srcW = src.GetLength(1);
+        var srcH = src.GetLength(0);
+        var srcW = src.GetLength(1);
 
-        double[,] dst = new double[newH, newW];
+        var dst = new double[newH, newW];
 
         for (int y = 0; y < newH; y++)
         {
@@ -221,21 +205,21 @@ public class VOtoVEConverter
             int y1 = Math.Min(y0 + 1, srcH - 1);
             double ty = gy - y0;
 
-            for (int x = 0; x < newW; x++)
+            for (var x = 0; x < newW; x++)
             {
-                double gx = x * (srcW - 1.0) / (newW - 1.0);
-                int x0 = (int)Math.Floor(gx);
-                int x1 = Math.Min(x0 + 1, srcW - 1);
-                double tx = gx - x0;
+                var gx = x * (srcW - 1.0) / (newW - 1.0);
+                var x0 = (int)Math.Floor(gx);
+                var x1 = Math.Min(x0 + 1, srcW - 1);
+                var tx = gx - x0;
 
-                double v00 = src[y0, x0];
-                double v01 = src[y0, x1];
-                double v10 = src[y1, x0];
-                double v11 = src[y1, x1];
+                var v00 = src[y0, x0];
+                var v01 = src[y0, x1];
+                var v10 = src[y1, x0];
+                var v11 = src[y1, x1];
 
                 // bilinear interpolation
-                double a = v00 * (1 - tx) + v01 * tx;
-                double b = v10 * (1 - tx) + v11 * tx;
+                var a = v00 * (1 - tx) + v01 * tx;
+                var b = v10 * (1 - tx) + v11 * tx;
                 dst[y, x] = a * (1 - ty) + b * ty;
             }
         }
@@ -245,22 +229,20 @@ public class VOtoVEConverter
 
     public double[,] CalculateVETable(double[] rpmValues, double[] loadValues, double iat, double displ)
     {
-        int rows = loadValues.Length;
-        int cols = rpmValues.Length;
-        m_VeTable = new double[rows, cols];
+        m_VeTable = new double[loadValues.Length, rpmValues.Length];
 
-        double absoluteTemp = iat + 273.15; // convert to Kelvin
-        double fixedRpm = rpmValues[0]; // always use first RPM value
+        var absoluteTemp = iat + 273.15; // convert to Kelvin
 
-        for (int row = 0; row < rows; row++)
+        for (var row = 0; row < loadValues.Length; row++)
         {
-            for (int col = 0; col < cols; col++)
+            for (var col = 0; col < rpmValues.Length; col++)
             {
-                double voValue = m_ExpandedVOTable[row, col];
-                double loadValue = loadValues[row];
+                var voValue = m_ExpandedVOTable[row, col];
+                var loadValue = loadValues[row];
+                var rpm = rpmValues[row];
 
-                double ve = (voValue * fixedRpm / AIRFLOW_FACTOR * R * absoluteTemp * MULTIPLIER)
-                    / (loadValue * displ * fixedRpm * MOL_WEIGHT_AIR * TIME_FACTOR);
+                var ve = (voValue * rpm / AIRFLOW_FACTOR * R * absoluteTemp * MULTIPLIER)
+                    / (loadValue * displ * rpm * MOL_WEIGHT_AIR * TIME_FACTOR);
 
                 // round to 3 decimal places
                 m_VeTable[row, col] = Math.Round(ve, 3);

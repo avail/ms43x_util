@@ -139,6 +139,16 @@ public static class Extensions
         ctrl.RowHeadersVisible = true;
         ctrl.AllowUserToOrderColumns = false;
 
+        ctrl.DefaultCellStyle.WrapMode = DataGridViewTriState.False;
+        //ctrl.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.AllCells;
+
+        ctrl.Columns.Clear();
+        ctrl.Rows.Clear();
+
+        ctrl.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleLeft;
+        ctrl.DefaultCellStyle.Padding = new Padding(0);
+        ctrl.DefaultCellStyle.Format = "";
+
         foreach (double header in columns)
         {
             DataGridViewTextBoxColumn col = new DataGridViewTextBoxColumn();
@@ -151,13 +161,14 @@ public static class Extensions
             col.Name = $"col_{header}";
             col.Width = 70;
             col.SortMode = DataGridViewColumnSortMode.NotSortable;
+            col.DefaultCellStyle.Format = "0.000";
             ctrl.Columns.Add(col);
         }
 
         for (int i = 0; i < rows.Length; i++)
         {
             int rowIndex = ctrl.Rows.Add();
-            ctrl.Rows[rowIndex].HeaderCell.Value = rows[i].ToString();
+            ctrl.Rows[rowIndex].HeaderCell.Value = rows[i].ToString("F3");
             ctrl.Rows[rowIndex].Height = 25;
         }
 

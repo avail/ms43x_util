@@ -5,7 +5,7 @@ namespace ms43x_util;
 public class XdfFile
 {
     public uint BaseOffset { get; set; } = 0;
-    public List<XdfTable> Tables { get; set; } = new();
+    public Dictionary<string, XdfTable> Tables { get; set; } = new();
 
     public XdfFile()
     {
@@ -61,14 +61,37 @@ public class XdfFile
             {
                 indexes.Add(k);
             }
+
+            if (isMS43)
+            {
+                if (v.Any(a => a.Contains("ldpm_n_32_10")))
+                {
+                    indexes.Add(k);
+                }
+                if (v.Any(a => a.Contains("ldpm_map_1")))
+                {
+                    indexes.Add(k);
+                }
+            }
+            else
+            {
+                if (v.Any(a => a.Contains("ldpm_ve_n")))
+                {
+                    indexes.Add(k);
+                }
+                if (v.Any(a => a.Contains("ldpm_ve_map")))
+                {
+                    indexes.Add(k);
+                }
+            }
         }
 
         // process the map stuff
-        var tables = new List<XdfTable>();
+        var tables = new Dictionary<string, XdfTable>();
         foreach (var idx in indexes)
         {
             var parsed = XdfTable.Parse(tableLines[idx]);
-            tables.Add(parsed);
+            tables.Add(parsed.Title, parsed);
         }
 
         return new XdfFile()
@@ -191,6 +214,13 @@ public class XdfBinaryReader
         return result;
     }
 
+    public double[] GetData(XdfAxis axis, string calc)
+    {
+        var data = Read1DData(axis, 16);
+
+        return XdfMath.ApplyMath(data, calc);
+    }
+
     public object ReadAxisData(XdfAxis axis)
     {
         if (axis.EmbeddedData == null)
@@ -211,7 +241,7 @@ public class XdfBinaryReader
         }
         else
         {
-            throw new InvalidOperationException("Use ReadAxisData(XdfAxis, int count) for 1D axes");
+            throw new InvalidOperationException("Use Read1DData(XdfAxis, int count) for 1D axes");
         }
     }
 

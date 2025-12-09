@@ -233,7 +233,7 @@ public class VOtoVEConverter
                 double v10 = src[y1, x0];
                 double v11 = src[y1, x1];
 
-                // Bilinear interpolation
+                // bilinear interpolation
                 double a = v00 * (1 - tx) + v01 * tx;
                 double b = v10 * (1 - tx) + v11 * tx;
                 dst[y, x] = a * (1 - ty) + b * ty;
